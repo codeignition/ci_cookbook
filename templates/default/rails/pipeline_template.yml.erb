@@ -1,0 +1,40 @@
+"<%= @app_name %>":
+  git_url: <%= @git_url %>
+  pipelines:
+    "<%= @app_name %>_Pipeline":
+      env_vars: 
+        PATH: /opt/ruby/embeddedi/bin:$PATH
+      Specs:
+        backend_tests:
+          steps:
+            - "bundle install --path ~/.local"
+      Package:
+        packages:
+          env_vars: 
+            PATH: /opt/ruby/embedded/bin:$PATH
+          steps:
+            - "rm -rf vendor/bundle" 
+            - "rm -f .bundle/config" 
+            - "rm -rf vendor/cache" 
+            - "bundle install --path ~/.local" 
+            - "RAILS_ENV=production bundle exec rake assets:precompile" 
+            - "bundle package --all" 
+            - "cp /opt/foreman_files/<%= @app_name %>/foreman.env ./" 
+            - "cp /opt/foreman_files/<%= @app_name %>/Procfile ./" 
+            - "mkdir -p ./init_scripts/" 
+            - "PATH=/opt/chef/embedded/bin:$PATH foreman export --app=<%= @app_name %> --user=<%= node[:org_name] %> -d /opt/<%= node[:org_name] %>/<%= @app_name %>/ -l /var/log/<%= @app_name %> -f Procfile -e foreman.env upstart ./init_scripts/" 
+            - "bundle install --local --deployment --without development:test" 
+            - "rm -rf <%= @app_name %>" 
+            - "mkdir <%= @app_name %>" 
+            - "ls | grep -vw <%= @app_name %> | grep -vw artifacts | xargs -I {} cp -r {} <%= @app_name %>" 
+            - "cp -r .bundle <%= @app_name %>" 
+            - "s3cmd get s3://packaged-builds/<%= @app_name %>/latest --force" 
+            - "echo $(($(cat latest) + 1)) > latestfile" 
+            - "mv latestfile latest" 
+            - "rm -f <%= @app_name %>-$(cat latest)-1.noarch.rpm" 
+            - "fpm -s dir -t rpm -n <%= @app_name %> -a all -v $(cat latest) --prefix /opt/<%= node[:org_name] %> --after-install ~/arsenal/<%= @app_name %>/after-install.sh --after-remove ~/arsenal/<%= @app_name %>/postrm.sh ./<%= @app_name %>" 
+            - "s3cmd put <%= @app_name %>-$(cat latest)-1.noarch.rpm s3://packaged-builds/<%= @app_name %>/ --force" 
+            - "s3cmd put latest s3://packaged-builds/<%= @app_name %>/" 
+            - "rm <%= @app_name %>-$(cat latest)-1.noarch.rpm" 
+            - "rm latest"
+go_server_url: <%= @go_server_url || 'localhost:8153' %>
